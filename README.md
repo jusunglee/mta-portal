@@ -1,6 +1,6 @@
 # MTA Portal
 
-<!-- <img src="MTAPortal.jpg" alt="drawing" width="300"/> -->
+<img src="https://github.com/user-attachments/assets/c5b749e5-761c-424d-8fc3-86d4a623432e" alt="drawing" width="300"/>
 
 Run your own MTA Portal on CircuitPython to display trains arrivals using Adafruit's [hardware](https://www.adafruit.com/product/4812) and libraries.
 

@@ -9,15 +9,39 @@ from adafruit_matrixportal.matrix import Matrix
 from adafruit_matrixportal.network import Network
 import adafruit_connection_manager
 import adafruit_requests
+import os
 
 STOP_ID = 'F20'
 DATA_SOURCE = 'https://api.wheresthefuckingtrain.com/by-id/%s' % (STOP_ID,)
 DATA_LOCATION = ["data"]
 UPDATE_DELAY = 15 # seconds
 SYNC_TIME_DELAY = 30 # seconds
-MINIMUM_MINUTES_DISPLAY = 5 # minutes
-BACKGROUND_IMAGE = 'g-dashboard.bmp'
+MINIMUM_MINUTES_DISPLAY = 3 # minutes
 ERROR_RESET_THRESHOLD = 3
+
+# Route icon configuration: letter, fill color, y-center position
+ROUTES = [
+    {"letter": "G", "color": 0x6CBE45, "y": 7},   # Green line
+    {"letter": "F", "color": 0xFF6319, "y": 23},  # Orange line
+]
+ICON_SIZE = 15
+
+def create_circle_bitmap(size, color):
+    """Create a filled circle bitmap."""
+    bitmap = displayio.Bitmap(size, size, 2)
+    palette = displayio.Palette(2)
+    palette[0] = 0x000000  # Background (black)
+    palette[1] = color
+    palette.make_transparent(0)
+
+    center = size // 2
+    radius = center - 0.5
+    for y in range(size):
+        for x in range(size):
+            dist = (x - center) ** 2 + (y - center) ** 2
+            if dist < radius ** 2:
+                bitmap[x, y] = 1
+    return displayio.TileGrid(bitmap, pixel_shader=palette)
 
 def get_arrival_in_minutes_from_now(now, date_str):
     train_date = datetime.fromisoformat(date_str).replace(tzinfo=None) # Remove tzinfo to be able to diff dates
@@ -50,34 +74,46 @@ def get_arrival_times():
     return g0, g1, f0, f1
 
 def update_text(g0, g1, f0, f1):
-    text_lines[2].text = "%s,%s m" % (g0, g1)
-    text_lines[4].text = "%s,%s m" % (f0, f1)
+    text_lines[0].text = "%s,%s m" % (g0, g1)
+    text_lines[1].text = "%s,%s m" % (f0, f1)
     display.root_group = group
 
 # --- Display setup ---
-print('boot')
-matrix = Matrix(bit_depth=6)
-print('Matrix')
+matrix = Matrix(bit_depth=4)
 display = matrix.display
 network = Network(status_neopixel=NEOPIXEL, debug=False)
-print('Network')
 
 # --- Drawing setup ---
 group = displayio.Group()
-bitmap = displayio.OnDiskBitmap(open(BACKGROUND_IMAGE, 'rb'))
-colors = [0xFFFFFF, 0xFFFF00]  # [white, yellow]
-
 font = bitmap_font.load_font("fonts/6x10.bdf")
+# Pre-cache all glyphs we'll use to avoid runtime memory allocation
+font.load_glyphs("0123456789-,. mGFQueensManhtn")
+
+# Create route icons and labels
+for route in ROUTES:
+    # Filled circle
+    circle = create_circle_bitmap(ICON_SIZE, route["color"])
+    circle.x = 1
+    circle.y = route["y"] - ICON_SIZE // 2
+    group.append(circle)
+
+    # Letter on top (black, hollow effect) - draw multiple times for bold
+    for offset_x, offset_y in [(0, 0), (1, 0)]:
+        letter_label = adafruit_display_text.label.Label(
+            font, color=0x000000, x=6 + offset_x, y=route["y"] + offset_y, text=route["letter"]
+        )
+        group.append(letter_label)
+
+# Direction labels and arrival time labels
+group.append(adafruit_display_text.label.Label(font, color=0xFFFFFF, x=18, y=3, text="Queens"))
+group.append(adafruit_display_text.label.Label(font, color=0xFFFFFF, x=18, y=19, text="Manhtn"))
+
 text_lines = [
-    displayio.TileGrid(bitmap, pixel_shader=getattr(bitmap, 'pixel_shader', displayio.ColorConverter())),
-    # Keep text at 7 chars or under otherwise it will overflow the display
-    adafruit_display_text.label.Label(font, color=colors[0], x=20, y=3, text="Queens"),
-    adafruit_display_text.label.Label(font, color=colors[1], x=20, y=11, text="- mins"),
-    adafruit_display_text.label.Label(font, color=colors[0], x=20, y=20, text="Manhat"),
-    adafruit_display_text.label.Label(font, color=colors[1], x=20, y=28, text="- mins"),
+    adafruit_display_text.label.Label(font, color=0xFFFF00, x=18, y=11, text="..."),   # G times
+    adafruit_display_text.label.Label(font, color=0xFFFF00, x=18, y=27, text="..."),   # F times
 ]
-for x in text_lines:
-    group.append(x)
+for label in text_lines:
+    group.append(label)
 display.root_group = group
 
 def setup_requests():
@@ -91,7 +127,7 @@ try:
     print("ESP32 firmware:", fw)
 except Exception as e:
     print("Could not get firmware:", e)
-import os
+
 wifi_ssid = os.getenv("CIRCUITPY_WIFI_SSID")
 if not wifi_ssid:
     raise Exception("No WiFi SSID found, did you create a settings.toml file?")
@@ -100,18 +136,11 @@ print("Connecting to WiFi SSID: %s" % (wifi_ssid,))
 network.connect()
 print("WiFi connected!")
 time.sleep(3)
+
 print("Getting time...")
 network.get_local_time()
-print("Connected! Letting ESP32 stabilize...")
+print("Connected!")
 time.sleep(3)
-
-# Test fetch to confirm connectivity
-print("Testing API connection...")
-try:
-    test = network.fetch_data("https://httpbin.org/get", json_path=(['url'],))
-    print("Test fetch worked:", test)
-except Exception as e:
-    print("Test fetch failed:", e)
 
 error_counter = 0
 last_time_sync = time.monotonic()
