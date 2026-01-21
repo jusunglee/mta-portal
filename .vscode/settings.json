@@ -1,0 +1,10 @@
+{
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": "code\\.py$",
+        "cmd": "cp ${file} /Volumes/CIRCUITPY/code.py"
+      }
+    ]
+  }
+}

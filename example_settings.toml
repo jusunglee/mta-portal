@@ -1,0 +1,4 @@
+CIRCUITPY_WIFI_SSID = "Your 2.4Ghz SSID"
+CIRCUITPY_WIFI_PASSWORD = "YOUR wifi password"
+ADAFRUIT_AIO_USERNAME = "your username at https://io.adafruit.com/YOUR_USERNAME/overview , key icon on the top right"
+ADAFRUIT_AIO_KEY      = "your aio key at above link"
