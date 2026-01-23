@@ -9,12 +9,14 @@ from adafruit_matrixportal.matrix import Matrix
 from adafruit_matrixportal.network import Network
 import adafruit_connection_manager
 import adafruit_requests
+import rtc
 import os
 
 STOP_ID = 'F20'
 DATA_SOURCE = 'https://api.wheresthefuckingtrain.com/by-id/%s' % (STOP_ID,)
 DATA_LOCATION = ["data"]
-UPDATE_DELAY = 15 # seconds
+TIME_API = 'http://worldtimeapi.org/api/timezone/America/New_York'
+UPDATE_DELAY = 1 # seconds
 SYNC_TIME_DELAY = 30 # seconds
 MINIMUM_MINUTES_DISPLAY = 3 # minutes
 ERROR_RESET_THRESHOLD = 3
@@ -25,6 +27,17 @@ ROUTES = [
     {"letter": "F", "color": 0xFF6319, "y": 23},  # Orange line
 ]
 ICON_SIZE = 15
+
+def sync_time():
+    """Sync RTC using WorldTimeAPI - auto-handles DST."""
+    print("Getting time from WorldTimeAPI")
+    response = network.fetch_data(TIME_API, json_path=(["datetime"],))
+    # fetch_data returns the string directly when there's one path
+    dt_str = response if isinstance(response, str) else response[0]
+    # Response format: "2026-01-23T15:23:10.123456-05:00"
+    dt_str = dt_str[:19]  # Trim to "2026-01-23T15:23:10"
+    dt = datetime.fromisoformat(dt_str)
+    rtc.RTC().datetime = dt.timetuple()
 
 def create_circle_bitmap(size, color):
     """Create a filled circle bitmap."""
@@ -48,9 +61,7 @@ def get_arrival_in_minutes_from_now(now, date_str):
     return round((train_date-now).total_seconds()/60.0)
 
 def get_arrival_times():
-    # Close any stale sockets before fetching
-    adafruit_connection_manager.connection_manager_close_all()
-    stop_trains =  network.fetch_data(DATA_SOURCE, json_path=(DATA_LOCATION,))
+    stop_trains = network.fetch_data(DATA_SOURCE, json_path=(DATA_LOCATION,))
     stop_data = stop_trains[0]
 
     # Filter northbound trains by route
@@ -138,9 +149,17 @@ print("WiFi connected!")
 time.sleep(3)
 
 print("Getting time...")
-network.get_local_time()
-print("Connected!")
-time.sleep(3)
+for attempt in range(3):
+    try:
+        sync_time()
+        print("Time synced!")
+        break
+    except (ConnectionError, OSError, RuntimeError, adafruit_requests.OutOfRetries) as e:
+        print("Time sync failed (attempt %d): %s" % (attempt + 1, e))
+        time.sleep(2)
+else:
+    print("Warning: Could not sync time, continuing anyway")
+time.sleep(1)
 
 error_counter = 0
 last_time_sync = time.monotonic()
@@ -149,12 +168,12 @@ while True:
         print("Syncing clock")
         if last_time_sync is None or time.monotonic() > last_time_sync + SYNC_TIME_DELAY:
             # Sync clock to minimize time drift
-            network.get_local_time()
+            sync_time()
             last_time_sync = time.monotonic()
         arrivals = get_arrival_times()
         update_text(*arrivals)
         error_counter = 0  # Reset on success
-    except (ValueError, RuntimeError, BrokenPipeError, OSError) as e:
+    except (ValueError, RuntimeError, BrokenPipeError, OSError, ConnectionError, adafruit_requests.OutOfRetries) as e:
         print("Error:", type(e).__name__, e)
         error_counter = error_counter + 1
         # Close all sockets and reset ESP32 to recover
