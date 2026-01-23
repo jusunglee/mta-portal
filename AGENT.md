@@ -9,7 +9,7 @@ This is a CircuitPython project running on a MatrixPortal device. The device aut
 1. Make edits to `code.py` (the main file that runs on the device)
 2. Run the serial capture to see output:
    ```bash
-   uv run serial_capture.py 15
+   uv run tools/serial_capture.py 15
    ```
    This will:
    - Touch `/Volumes/CIRCUITPY/code.py` to trigger a device restart
@@ -29,8 +29,9 @@ This is a CircuitPython project running on a MatrixPortal device. The device aut
 - `code.py` - Main application code (runs on device)
 - `settings.toml` - WiFi credentials (on device, not in repo)
 - `example_settings.toml` - Template for settings.toml
-- `serial_capture.py` - One-shot serial capture for debugging
-- `serial_monitor.py` - Continuous serial monitor
+- `tools/serial_capture.py` - One-shot serial capture for debugging
+- `tools/serial_monitor.py` - Continuous serial monitor
+- `tools/test_wifi_and_esp32.py` - WiFi and ESP32 test utility
 
 ### Device Location
 

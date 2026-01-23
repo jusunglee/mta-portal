@@ -21,7 +21,7 @@ TODO: A script to automate all this?
 4. Click the reset button on the circuit twice, which will trigger a bootloader mode and mount a device. 
 5. Copy over the uf2 file you got from the tutorial, should be for CircuitPython 10.x
 6. Copy over all of the contents of this repo to the drive 
-7. In a separate terminal run `uv run serial_monitor.py` to watch the debug output
+7. In a separate terminal run `uv run tools/serial_monitor.py` to watch the debug output
 8. Any writes to disk will trigger a restart of `code.py`, and be displayed in the terminal above. There's a vscode/cursor project setting in this repo (you need to install the run-on-save vsix via the vs code command palette if you're using cursor) that will automatically cp over the file to trigger the write + restart from your main disk. I would not recommend opening the project on the mounted disk for obvious reasons.
 9. This is just to get `code.py` running, follow the below steps to get the business logic functional.
 
