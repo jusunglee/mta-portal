@@ -1,0 +1,1 @@
+From https://marketplace.visualstudio.com/items?itemName=emeraldwalk.RunOnSave, since cursor doesn't allow jsut any extensions to be installed.
