@@ -6,6 +6,10 @@ Run your own MTA Portal on CircuitPython to display trains arrivals using Adafru
 
 Follow Adafruit main [tutorial](https://learn.adafruit.com/adafruit-matrixportal-m4) to set up your MatrixPortal. 
 
+## Prerequisites
+- Python 3.14+
+- `brew install uv`
+
 ## Setup to get code running on your device but not yet business-functional
 There's a few incantations and dances you'll have to do to set up everything, maybe 10 minutes. 
 
