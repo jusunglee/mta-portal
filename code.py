@@ -46,6 +46,7 @@ ICON_SIZE = 15
 def sync_time():
     """Sync RTC using WorldTimeAPI - auto-handles DST."""
     global utc_offset_seconds
+    gc.collect()  # Free memory before network call
     print("Getting time from WorldTimeAPI")
     response = network.fetch_data(TIME_API, json_path=(["datetime"],))
     dt_str = response if isinstance(response, str) else response[0]
@@ -83,6 +84,7 @@ def get_arrival_in_minutes_from_now(now, date_str):
     return round((train_date-now).total_seconds()/60.0)
 
 def get_arrival_times():
+    gc.collect()  # Free memory before network call
     stop_trains = network.fetch_data(DATA_SOURCE, json_path=(DATA_LOCATION,))
     stop_data = stop_trains[0]
 
@@ -118,8 +120,8 @@ network = Network(status_neopixel=NEOPIXEL, debug=False)
 # --- Drawing setup ---
 group = displayio.Group()
 font = bitmap_font.load_font("fonts/6x10.bdf")
-# Pre-cache all glyphs we'll use to avoid runtime memory allocation
-font.load_glyphs("0123456789-,. mGFQueensManhtn")
+# Pre-cache only required glyphs to save memory
+font.load_glyphs("0123456789-,.mGFQeunsMaht")
 
 # Create route icons and labels
 for route in ROUTES:
@@ -157,6 +159,7 @@ def send_metrics(requests_session, uptime_seconds, error_count):
     """Send health metrics to InfluxDB"""
     if not INFLUX_URL or not INFLUX_TOKEN:
         return
+    gc.collect()  # Free memory before measuring and sending
     try:
         # Build fields
         fields = f"uptime={uptime_seconds}i,errors={error_count}i"
