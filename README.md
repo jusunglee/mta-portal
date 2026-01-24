@@ -33,4 +33,19 @@ You'll also need to
 3. Edit `code.py` so that you get your [relevant stop info](https://github.com/jonthornton/MTAPI/blob/master/data/stations.json) and directions, etc. Would advise just to use an LLM for this.
 4. Save the file which will trigger a cp to the mounted device and trigger a restart.
 
+## Observability
+
+Metrics are exported to Ingest (InfluxDB) and logs are shipped to Loki. Both can be queried through Grafana for monitoring device health, network errors, and train data fetch performance.
+
+Configure the following variables in `settings.toml`:
+
+| Variable | Description |
+|----------|-------------|
+| `INFLUX_URL` | InfluxDB/Ingest endpoint URL |
+| `INFLUX_TOKEN` | Authentication token for InfluxDB |
+| `INFLUX_ORG` | InfluxDB organization |
+| `INFLUX_BUCKET` | InfluxDB bucket to write metrics to |
+| `LOKI_URL` | Loki push API endpoint for logs |
+| `DEVICE_HOST` | Hostname label for identifying this device in queries (e.g., `matrix-portal`) |
+
 Forked from https://github.com/thejsj/mta-portal, which apparently itself is a fork. Shoutout Jorge . This one's more noob friendly and I save you all the meandering I had to endure as a software engineer who doesn't know anything about hardware. If you follow the steps exactly as I listed, you will get a working demo. If you know what you're doing then use Jorge's repo because it's way more minimal.

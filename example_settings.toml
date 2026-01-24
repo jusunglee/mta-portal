@@ -1,2 +1,11 @@
 CIRCUITPY_WIFI_SSID = "Your 2.4Ghz SSID"
 CIRCUITPY_WIFI_PASSWORD = "YOUR wifi password"
+
+INFLUX_URL = ""
+INFLUX_TOKEN = ""
+INFLUX_ORG = ""
+INFLUX_BUCKET = ""
+
+DEVICE_HOST = "matrix-portal"
+
+LOKI_URL = ""

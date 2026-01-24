@@ -4,6 +4,10 @@
       {
         "match": "code\\.py$",
         "cmd": "cp ${file} /Volumes/CIRCUITPY/code.py"
+      },
+      {
+        "match": "settings\\.toml$",
+        "cmd": "cp ${file} /Volumes/CIRCUITPY/settings.toml"
       }
     ]
   }
