@@ -37,17 +37,29 @@ You'll also need to
 <img width="1525" height="1097" alt="image" src="https://github.com/user-attachments/assets/6326b953-0df2-44eb-b23c-aff622965e4e" />
 
 
-Metrics are exported to Ingest (InfluxDB) and logs are shipped to Loki. Both can be queried through Grafana for monitoring device health, network errors, and train data fetch performance.
+Metrics are exported to InfluxDB and logs are shipped to Loki. Both can be queried through Grafana for monitoring device health, network errors, and train data fetch performance.
 
 Configure the following variables in `settings.toml`:
 
 | Variable | Description |
 |----------|-------------|
-| `INFLUX_URL` | InfluxDB/Ingest endpoint URL |
+| `INFLUX_URL` | InfluxDB endpoint URL |
 | `INFLUX_TOKEN` | Authentication token for InfluxDB |
 | `INFLUX_ORG` | InfluxDB organization |
 | `INFLUX_BUCKET` | InfluxDB bucket to write metrics to |
 | `LOKI_URL` | Loki push API endpoint for logs |
 | `DEVICE_HOST` | Hostname label for identifying this device in queries (e.g., `matrix-portal`) |
 
+I personally set it to my always-online mac pro's local address, where I am running loki, influx, and grafana on docker:
+```
+> docker run -d --name grafana -p 3000:3000 grafana/grafana:latest
+> docker run -d --name loki -p 3100:3100 grafana/loki:latest
+> docker run -d --name influxdb -p 8086:8086 -v influxdb-data:/var/lib/influxdb2 influxdb:2
+```
+
+TODO: Bootstrap script for setting up observability stack? There's some manual labor needed to configure buckets, api keys, etc, so that the pipeline can work.
+
+
+
+## Acknowledgements
 Forked from https://github.com/thejsj/mta-portal, which apparently itself is a fork. Shoutout Jorge . This one's more noob friendly and I save you all the meandering I had to endure as a software engineer who doesn't know anything about hardware. If you follow the steps exactly as I listed, you will get a working demo. If you know what you're doing then use Jorge's repo because it's way more minimal.
