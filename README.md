@@ -34,6 +34,8 @@ You'll also need to
 4. Save the file which will trigger a cp to the mounted device and trigger a restart.
 
 ## Observability
+<img width="1525" height="1097" alt="image" src="https://github.com/user-attachments/assets/6326b953-0df2-44eb-b23c-aff622965e4e" />
+
 
 Metrics are exported to Ingest (InfluxDB) and logs are shipped to Loki. Both can be queried through Grafana for monitoring device health, network errors, and train data fetch performance.
 
