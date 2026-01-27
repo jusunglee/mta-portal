@@ -51,7 +51,7 @@ def monitor_serial():
                 text = line.decode('utf-8', errors='ignore').rstrip()
                 # Filter out terminal control sequences for cleaner output
                 if text and not text.startswith('\x1b]0;'):
-                    print(text)
+                    print(text, flush=True)
 
         except (serial.SerialException, OSError):
             if ser:

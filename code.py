@@ -22,6 +22,7 @@ SYNC_TIME_DELAY = 30 # seconds
 METRICS_DELAY = 60 # seconds
 MINIMUM_MINUTES_DISPLAY = 3 # minutes
 ERROR_RESET_THRESHOLD = 3
+NVM_OOM_INDEX = 0  # byte offset in microcontroller.nvm for OOM reset counter
 
 # InfluxDB metrics configuration, through settings.toml
 INFLUX_URL = os.getenv("INFLUX_URL")
@@ -162,30 +163,31 @@ def send_metrics(requests_session, uptime_seconds, error_count):
     gc.collect()  # Free memory before measuring and sending
     try:
         # Build fields
-        fields = f"uptime={uptime_seconds}i,errors={error_count}i"
-        fields += f",mem_free={gc.mem_free()}i,mem_alloc={gc.mem_alloc()}i"
+        fields = "uptime=%di,errors=%di,oom_resets=%di" % (uptime_seconds, error_count, microcontroller.nvm[NVM_OOM_INDEX])
+        fields += ",mem_free=%di,mem_alloc=%di" % (gc.mem_free(), gc.mem_alloc())
         try:
             ap_info = network._wifi.esp.ap_info
             # ap_info can be a tuple (ssid, bssid, rssi, ...) or a Network object with .rssi attribute
             if hasattr(ap_info, 'rssi'):
-                fields += f",wifi_rssi={ap_info.rssi}i"
+                fields += ",wifi_rssi=%di" % (ap_info.rssi,)
             elif isinstance(ap_info, (tuple, list)) and len(ap_info) > 2:
-                fields += f",wifi_rssi={ap_info[2]}i"
+                fields += ",wifi_rssi=%di" % (ap_info[2],)
         except (AttributeError, IndexError, TypeError):
             pass  # RSSI not available, skip it
 
-        line = f"matrix_portal,host={DEVICE_HOST} {fields}"
+        line = "matrix_portal,host=%s %s" % (DEVICE_HOST, fields)
         headers = {
-            "Authorization": f"Token {INFLUX_TOKEN}",
+            "Authorization": "Token %s" % (INFLUX_TOKEN,),
             "Content-Type": "text/plain"
         }
-        url = f"{INFLUX_URL}/api/v2/write?org={INFLUX_ORG}&bucket={INFLUX_BUCKET}"
-        print(f"Sending: {line}")
+        url = "%s/api/v2/write?org=%s&bucket=%s" % (INFLUX_URL, INFLUX_ORG, INFLUX_BUCKET)
+        print("Sending: %s" % (line,))
         response = requests_session.post(url, data=line, headers=headers)
-        print(f"Metrics: {response.status_code}")
+        print("Metrics: %s" % (response.status_code,))
         response.close()  # Free socket resources
+        gc.collect()
     except Exception as e:
-        print(f"Metrics send failed: {e}")
+        print("Metrics send failed: %s" % (e,))
 
 def send_log(requests_session, level, message):
     """Send log entry to Loki"""
@@ -204,8 +206,9 @@ def send_log(requests_session, level, message):
             headers={"Content-Type": "application/json"}
         )
         response.close()  # Free socket resources immediately
+        gc.collect()
     except Exception as e:
-        print(f"Log send failed: {e}")
+        print("Log send failed: %s" % (e,))
 
 # Force WiFi connection before main loop
 try:
@@ -218,6 +221,7 @@ wifi_ssid = os.getenv("CIRCUITPY_WIFI_SSID")
 if not wifi_ssid:
     raise Exception("No WiFi SSID found, did you create a settings.toml file?")
 
+print("OOM resets: %d" % (microcontroller.nvm[NVM_OOM_INDEX],))
 print("Connecting to WiFi SSID: %s" % (wifi_ssid,))
 network.connect()
 print("WiFi connected!")
@@ -244,6 +248,7 @@ requests_session = setup_requests()
 send_log(requests_session, "info", "Device started")
 
 while True:
+    print("Free mem:", gc.mem_free())
     try:
         print("Syncing clock")
         if last_time_sync is None or time.monotonic() > last_time_sync + SYNC_TIME_DELAY:
@@ -253,7 +258,6 @@ while True:
             send_log(requests_session, "info", "Time synced")
         arrivals = get_arrival_times()
         update_text(*arrivals)
-        send_log(requests_session, "info", "Arrivals updated, g0: %s, g1: %s, f0: %s, f1: %s" % (arrivals[0], arrivals[1], arrivals[2], arrivals[3]))
         error_counter = 0  # Reset on success
 
         # Send metrics periodically
@@ -261,8 +265,13 @@ while True:
             uptime = int(time.monotonic() - start_time)
             send_metrics(requests_session, uptime, error_counter)
             last_metrics_send = time.monotonic()
+    except MemoryError:
+        print("OOM, forcing full reset...")
+        microcontroller.nvm[NVM_OOM_INDEX] = min(microcontroller.nvm[NVM_OOM_INDEX] + 1, 255)
+        time.sleep(1)
+        microcontroller.reset()
     except (ValueError, RuntimeError, BrokenPipeError, OSError, ConnectionError, adafruit_requests.OutOfRetries) as e:
-        error_msg = f"{type(e).__name__}: {e}"
+        error_msg = "%s: %s" % (type(e).__name__, e)
         print("Error:", error_msg)
         send_log(requests_session, "error", error_msg)
         error_counter = error_counter + 1
@@ -273,7 +282,7 @@ while True:
         time.sleep(2)
         network.connect()
         requests_session = setup_requests()
-        send_log(requests_session, "info", f"Recovered from error, count: {error_counter}")
+        send_log(requests_session, "info", "Recovered from error, count: %d" % (error_counter,))
         if error_counter > ERROR_RESET_THRESHOLD:
             print("Too many errors, full reset...")
             time.sleep(1)
