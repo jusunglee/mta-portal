@@ -273,16 +273,24 @@ while True:
     except (ValueError, RuntimeError, BrokenPipeError, OSError, ConnectionError, adafruit_requests.OutOfRetries) as e:
         error_msg = "%s: %s" % (type(e).__name__, e)
         print("Error:", error_msg)
-        send_log(requests_session, "error", error_msg)
         error_counter = error_counter + 1
+        try:
+            send_log(requests_session, "error", error_msg)
+        except:
+            pass  # Logging failure is not critical
         # Close all sockets and reset ESP32 to recover
         adafruit_connection_manager.connection_manager_close_all()
         print("Resetting ESP32, error count:", error_counter)
         network._wifi.esp.reset()
         time.sleep(2)
-        network.connect()
-        requests_session = setup_requests()
-        send_log(requests_session, "info", "Recovered from error, count: %d" % (error_counter,))
+        try:
+            network.connect()
+            requests_session = setup_requests()
+            send_log(requests_session, "info", "Recovered from error, count: %d" % (error_counter,))
+        except Exception as recovery_err:
+            print("Recovery failed: %s, forcing full reset..." % (recovery_err,))
+            time.sleep(1)
+            microcontroller.reset()
         if error_counter > ERROR_RESET_THRESHOLD:
             print("Too many errors, full reset...")
             time.sleep(1)
