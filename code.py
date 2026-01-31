@@ -189,6 +189,25 @@ def send_metrics(requests_session, uptime_seconds, error_count):
     except Exception as e:
         print("Metrics send failed: %s" % (e,))
 
+def send_startup_metric(requests_session):
+    """Send startup event metric to InfluxDB"""
+    if not INFLUX_URL or not INFLUX_TOKEN:
+        return
+    try:
+        line = "matrix_portal_startup,host=%s value=1i" % (DEVICE_HOST,)
+        headers = {
+            "Authorization": "Token %s" % (INFLUX_TOKEN,),
+            "Content-Type": "text/plain"
+        }
+        url = "%s/api/v2/write?org=%s&bucket=%s" % (INFLUX_URL, INFLUX_ORG, INFLUX_BUCKET)
+        print("Sending startup metric")
+        response = requests_session.post(url, data=line, headers=headers)
+        print("Startup metric: %s" % (response.status_code,))
+        response.close()
+        gc.collect()
+    except Exception as e:
+        print("Startup metric failed: %s" % (e,))
+
 def send_log(requests_session, level, message):
     """Send log entry to Loki"""
     if not LOKI_URL:
@@ -247,6 +266,7 @@ last_metrics_send = 0
 start_time = time.monotonic()
 requests_session = setup_requests()
 send_log(requests_session, "info", "Device started")
+send_startup_metric(requests_session)
 
 while True:
     print("Free mem:", gc.mem_free())
@@ -259,13 +279,13 @@ while True:
             send_log(requests_session, "info", "Time synced")
         arrivals = get_arrival_times()
         update_text(*arrivals)
-        error_counter = 0  # Reset on success
 
         # Send metrics periodically
         if time.monotonic() > last_metrics_send + METRICS_DELAY:
             uptime = int(time.monotonic() - start_time)
             send_metrics(requests_session, uptime, error_counter)
             last_metrics_send = time.monotonic()
+        error_counter = 0  # Reset on success
     except MemoryError:
         print("OOM, forcing full reset...")
         microcontroller.nvm[NVM_OOM_INDEX] = min(microcontroller.nvm[NVM_OOM_INDEX] + 1, 255)
