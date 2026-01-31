@@ -239,6 +239,7 @@ for attempt in range(3):
 else:
     print("Warning: Could not sync time, continuing anyway")
 time.sleep(1)
+gc.collect()  # Free memory from time sync before main loop setup
 
 error_counter = 0
 last_time_sync = time.monotonic()
