@@ -270,7 +270,7 @@ while True:
         microcontroller.nvm[NVM_OOM_INDEX] = min(microcontroller.nvm[NVM_OOM_INDEX] + 1, 255)
         time.sleep(1)
         microcontroller.reset()
-    except (ValueError, RuntimeError, BrokenPipeError, OSError, ConnectionError, adafruit_requests.OutOfRetries) as e:
+    except Exception as e:
         error_msg = "%s: %s" % (type(e).__name__, e)
         print("Error:", error_msg)
         error_counter = error_counter + 1
