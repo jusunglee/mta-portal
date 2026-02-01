@@ -44,13 +44,15 @@ ROUTES = [
 ]
 ICON_SIZE = 15
 
-def sync_time():
+def sync_time(requests_session):
     """Sync RTC using WorldTimeAPI - auto-handles DST."""
     global utc_offset_seconds
     gc.collect()  # Free memory before network call
     print("Getting time from WorldTimeAPI")
-    response = network.fetch_data(TIME_API, json_path=(["datetime"],))
-    dt_str = response if isinstance(response, str) else response[0]
+    response = requests_session.get(TIME_API)
+    data = response.json()
+    response.close()
+    dt_str = data["datetime"]
     # Response format: "2026-01-23T15:23:10.123456-05:00"
     # Extract UTC offset from the datetime string (last 6 chars like "-05:00")
     utc_offset_str = dt_str[-6:]
@@ -62,6 +64,7 @@ def sync_time():
     hours = int(utc_offset_str[1:3])
     minutes = int(utc_offset_str[4:6])
     utc_offset_seconds = sign * (hours * 3600 + minutes * 60)
+    gc.collect()
 
 def create_circle_bitmap(size, color):
     """Create a filled circle bitmap."""
@@ -84,10 +87,13 @@ def get_arrival_in_minutes_from_now(now, date_str):
     train_date = datetime.fromisoformat(date_str).replace(tzinfo=None) # Remove tzinfo to be able to diff dates
     return round((train_date-now).total_seconds()/60.0)
 
-def get_arrival_times():
+def get_arrival_times(requests_session):
     gc.collect()  # Free memory before network call
-    stop_trains = network.fetch_data(DATA_SOURCE, json_path=(DATA_LOCATION,))
-    stop_data = stop_trains[0]
+    response = requests_session.get(DATA_SOURCE)
+    data = response.json()
+    response.close()
+    gc.collect()
+    stop_data = data["data"][0]
 
     # Filter northbound trains by route
     g_trains = [x['time'] for x in stop_data['N'] if x['route'] == 'G']
@@ -246,10 +252,14 @@ network.connect()
 print("WiFi connected!")
 time.sleep(3)
 
+# Create single requests session for all network calls (saves memory vs network.fetch_data)
+requests_session = setup_requests()
+gc.collect()
+
 print("Getting time...")
 for attempt in range(3):
     try:
-        sync_time()
+        sync_time(requests_session)
         print("Time synced!")
         break
     except (ConnectionError, OSError, RuntimeError, adafruit_requests.OutOfRetries) as e:
@@ -257,27 +267,26 @@ for attempt in range(3):
         time.sleep(2)
 else:
     print("Warning: Could not sync time, continuing anyway")
-time.sleep(1)
-gc.collect()  # Free memory from time sync before main loop setup
 
+gc.collect()  # Free memory before main loop
 error_counter = 0
 last_time_sync = time.monotonic()
 last_metrics_send = 0
 start_time = time.monotonic()
-requests_session = setup_requests()
 send_log(requests_session, "info", "Device started")
 send_startup_metric(requests_session)
 
 while True:
     print("Free mem:", gc.mem_free())
     try:
-        print("Syncing clock")
         if last_time_sync is None or time.monotonic() > last_time_sync + SYNC_TIME_DELAY:
             # Sync clock to minimize time drift
-            sync_time()
+            print("Syncing clock")
+            sync_time(requests_session)
             last_time_sync = time.monotonic()
             send_log(requests_session, "info", "Time synced")
-        arrivals = get_arrival_times()
+        print("Retrieving data...")
+        arrivals = get_arrival_times(requests_session)
         update_text(*arrivals)
 
         # Send metrics periodically
