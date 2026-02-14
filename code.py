@@ -15,8 +15,8 @@ import os
 STOP_ID = 'F20'
 DATA_SOURCE = 'https://api.wheresthefuckingtrain.com/by-id/%s' % (STOP_ID,)
 DATA_LOCATION = ["data"]
-TIME_API = 'http://worldtimeapi.org/api/timezone/America/New_York'
-UPDATE_DELAY = 1 # seconds
+TIME_API = 'http://timeapi.io/api/time/current/zone?timeZone=America/New_York'
+UPDATE_DELAY = 30 # seconds
 SYNC_TIME_DELAY = 30 # seconds
 MINIMUM_MINUTES_DISPLAY = 3 # minutes
 ERROR_RESET_THRESHOLD = 3
@@ -29,9 +29,9 @@ ROUTES = [
 ICON_SIZE = 15
 
 def sync_time():
-    """Sync RTC using WorldTimeAPI - auto-handles DST."""
-    print("Getting time from WorldTimeAPI")
-    response = network.fetch_data(TIME_API, json_path=(["datetime"],))
+    """Sync RTC using timeapi.io - auto-handles DST."""
+    print("Getting time from timeapi.io")
+    response = network.fetch_data(TIME_API, json_path=(["dateTime"],))
     # fetch_data returns the string directly when there's one path
     dt_str = response if isinstance(response, str) else response[0]
     # Response format: "2026-01-23T15:23:10.123456-05:00"
@@ -149,17 +149,21 @@ print("WiFi connected!")
 time.sleep(3)
 
 print("Getting time...")
-for attempt in range(3):
+a = 0
+for attempt in range(30):
+    a = attempt
     try:
         sync_time()
         print("Time synced!")
         break
-    except (ConnectionError, OSError, RuntimeError, adafruit_requests.OutOfRetries) as e:
+    except (Exception) as e:
         print("Time sync failed (attempt %d): %s" % (attempt + 1, e))
         time.sleep(2)
 else:
     print("Warning: Could not sync time, continuing anyway")
 time.sleep(1)
+
+print('Took %d attempts to sync time' % attempt)
 
 error_counter = 0
 last_time_sync = time.monotonic()
