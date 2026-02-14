@@ -16,8 +16,8 @@ import gc
 STOP_ID = 'F20'
 DATA_SOURCE = 'https://api.wheresthefuckingtrain.com/by-id/%s' % (STOP_ID,)
 DATA_LOCATION = ["data"]
-TIME_API = 'http://worldtimeapi.org/api/timezone/America/New_York'
-UPDATE_DELAY = 15 # seconds
+TIME_API = 'http://timeapi.io/api/time/current/zone?timeZone=America/New_York'
+UPDATE_DELAY = 30 # seconds
 SYNC_TIME_DELAY = 30 # seconds
 METRICS_DELAY = 60 # seconds
 MINIMUM_MINUTES_DISPLAY = 3 # minutes
@@ -44,15 +44,12 @@ ROUTES = [
 ]
 ICON_SIZE = 15
 
-def sync_time(requests_session):
-    """Sync RTC using WorldTimeAPI - auto-handles DST."""
-    global utc_offset_seconds
-    gc.collect()  # Free memory before network call
-    print("Getting time from WorldTimeAPI")
-    response = requests_session.get(TIME_API)
-    data = response.json()
-    response.close()
-    dt_str = data["datetime"]
+def sync_time():
+    """Sync RTC using timeapi.io - auto-handles DST."""
+    print("Getting time from timeapi.io")
+    response = network.fetch_data(TIME_API, json_path=(["dateTime"],))
+    # fetch_data returns the string directly when there's one path
+    dt_str = response if isinstance(response, str) else response[0]
     # Response format: "2026-01-23T15:23:10.123456-05:00"
     # Extract UTC offset from the datetime string (last 6 chars like "-05:00")
     utc_offset_str = dt_str[-6:]
@@ -257,18 +254,21 @@ requests_session = setup_requests()
 gc.collect()
 
 print("Getting time...")
-for attempt in range(3):
+a = 0
+for attempt in range(30):
+    a = attempt
     try:
-        sync_time(requests_session)
+        sync_time()
         print("Time synced!")
         break
-    except (ConnectionError, OSError, RuntimeError, adafruit_requests.OutOfRetries) as e:
+    except (Exception) as e:
         print("Time sync failed (attempt %d): %s" % (attempt + 1, e))
         time.sleep(2)
 else:
     print("Warning: Could not sync time, continuing anyway")
 
-gc.collect()  # Free memory before main loop
+print('Took %d attempts to sync time' % attempt)
+
 error_counter = 0
 last_time_sync = time.monotonic()
 last_metrics_send = 0
@@ -282,7 +282,7 @@ while True:
         if last_time_sync is None or time.monotonic() > last_time_sync + SYNC_TIME_DELAY:
             # Sync clock to minimize time drift
             print("Syncing clock")
-            sync_time(requests_session)
+            sync_time()
             last_time_sync = time.monotonic()
             send_log(requests_session, "info", "Time synced")
         print("Retrieving data...")
