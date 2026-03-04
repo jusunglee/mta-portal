@@ -14,7 +14,8 @@ import os
 import gc
 
 STOP_ID = 'F20'
-DATA_SOURCE = 'https://api.wheresthefuckingtrain.com/by-id/%s' % (STOP_ID,)
+API_BASE = os.getenv("MTAPI_BASE_URL", "https://api.wheresthefuckingtrain.com")
+DATA_SOURCE = '%s/by-id/%s' % (API_BASE, STOP_ID)
 DATA_LOCATION = ["data"]
 TIME_API = 'http://timeapi.io/api/time/current/zone?timeZone=America/New_York'
 UPDATE_DELAY = 30 # seconds
@@ -84,13 +85,10 @@ def get_arrival_in_minutes_from_now(now, date_str):
     train_date = datetime.fromisoformat(date_str).replace(tzinfo=None) # Remove tzinfo to be able to diff dates
     return round((train_date-now).total_seconds()/60.0)
 
-def get_arrival_times(requests_session):
-    gc.collect()  # Free memory before network call
-    response = requests_session.get(DATA_SOURCE)
-    data = response.json()
-    response.close()
-    gc.collect()
-    stop_data = data["data"][0]
+def get_arrival_times():
+    print("Fetching from %s" % DATA_SOURCE)
+    stop_trains = network.fetch_data(DATA_SOURCE, json_path=(DATA_LOCATION,))
+    stop_data = stop_trains[0]
 
     # Filter northbound trains by route
     g_trains = [x['time'] for x in stop_data['N'] if x['route'] == 'G']
@@ -286,7 +284,7 @@ while True:
             last_time_sync = time.monotonic()
             send_log(requests_session, "info", "Time synced")
         print("Retrieving data...")
-        arrivals = get_arrival_times(requests_session)
+        arrivals = get_arrival_times()
         update_text(*arrivals)
 
         # Send metrics periodically
@@ -295,12 +293,7 @@ while True:
             send_metrics(requests_session, uptime, error_counter)
             last_metrics_send = time.monotonic()
         error_counter = 0  # Reset on success
-    except MemoryError:
-        print("OOM, forcing full reset...")
-        microcontroller.nvm[NVM_OOM_INDEX] = min(microcontroller.nvm[NVM_OOM_INDEX] + 1, 255)
-        time.sleep(1)
-        microcontroller.reset()
-    except Exception as e:
+    except (ValueError, RuntimeError, BrokenPipeError, OSError, ConnectionError, adafruit_requests.OutOfRetries, Exception) as e:
         error_msg = "%s: %s" % (type(e).__name__, e)
         print("Error:", error_msg)
         error_counter = error_counter + 1
